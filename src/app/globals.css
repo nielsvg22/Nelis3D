@@ -39,3 +39,15 @@ body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; lette
 @keyframes rise { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
 .rise { animation: rise .25s ease-out both; }
 @media (prefers-reduced-motion: reduce) { .shimmer, .bar-indeterminate::after, .rise { animation: none } }
+
+/* ── phone ergonomics ── */
+html { -webkit-text-size-adjust: 100%; }
+body { touch-action: manipulation; overscroll-behavior-y: none; padding-bottom: env(safe-area-inset-bottom); }
+header { padding-top: env(safe-area-inset-top); }
+/* iOS Safari zooms into inputs below 16px */
+@media (max-width: 1023px) { input, textarea, select { font-size: 16px !important; } }
+/* comfortable tap targets on touch devices */
+@media (pointer: coarse) {
+  button, [role="button"], select { min-height: 40px; }
+  
+}

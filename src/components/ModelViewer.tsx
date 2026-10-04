@@ -243,7 +243,7 @@ export function ModelViewer({ url, meshKey, bed = { x: 300, y: 300 }, overhangDe
         <div className="scroll-thin flex max-w-full gap-0.5 overflow-x-auto rounded-full bg-white/90 p-1 shadow-sm ring-1 ring-black/5 backdrop-blur">
           {(Object.keys(LABELS) as (keyof Toggles)[]).map((k) => (
             <button key={k} title={LABELS[k].title} aria-label={LABELS[k].title} aria-pressed={toggles[k]} onClick={() => flip(k)}
-              className={cx("grid size-8 shrink-0 place-items-center rounded-full transition", toggles[k] ? "bg-ink text-white" : "text-ink-2 hover:bg-black/5")}>
+              className={cx("grid size-10 shrink-0 place-items-center rounded-full transition sm:size-8", toggles[k] ? "bg-ink text-white" : "text-ink-2 hover:bg-black/5")}>
               <Icon name={LABELS[k].icon} />
             </button>
           ))}
@@ -254,7 +254,7 @@ export function ModelViewer({ url, meshKey, bed = { x: 300, y: 300 }, overhangDe
 }
 
 function IconBtn(p: React.ButtonHTMLAttributes<HTMLButtonElement>) {
-  return <button {...p} aria-label={p.title} className="grid size-8 place-items-center rounded-full bg-white/90 text-ink-2 shadow-sm ring-1 ring-black/5 backdrop-blur transition hover:text-ink" />;
+  return <button {...p} aria-label={p.title} className="grid size-10 place-items-center rounded-full bg-white/90 text-ink-2 shadow-sm sm:size-8 ring-1 ring-black/5 backdrop-blur transition hover:text-ink" />;
 }
 
 // ───────────────────────────── three helpers ─────────────────────────────

@@ -71,7 +71,7 @@ export function Workspace({ initial }: { initial: ProjectDetailDTO }) {
       {/* LEFT – project / scan / versions */}
       <aside className="card scroll-thin order-3 overflow-y-auto p-4 lg:order-none">
         <div className="mb-5">
-          <Link href="/projects" className="mb-2 inline-flex items-center gap-1 text-xs text-ink-3 hover:text-ink">← Projects</Link>
+          <Link href="/projects" className="mb-1 inline-flex min-h-10 items-center gap-1 text-sm text-ink-3 hover:text-ink">← Projects</Link>
           {name === null ? (
             <h1 className="cursor-text truncate text-xl font-semibold tracking-tight" onClick={() => setName(project.name)} title="Click to rename">{project.name}</h1>
           ) : (
@@ -114,8 +114,8 @@ export function Workspace({ initial }: { initial: ProjectDetailDTO }) {
       </section>
 
       {/* RIGHT – chat + model info (stacked on mobile, tabbed on desktop) */}
-      <aside className="order-2 flex min-h-0 flex-col gap-3 lg:order-none">
-        <div className="card flex min-h-0 flex-1 flex-col overflow-hidden">
+      <aside className="order-2 flex flex-col gap-3 lg:order-none lg:min-h-0">
+        <div className="card flex flex-col overflow-hidden lg:min-h-0 lg:flex-1">
           <div className="hidden border-b hairline p-1.5 lg:flex" role="tablist">
             {(["chat", "model"] as const).map((t) => (
               <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={cx("flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl text-sm font-medium transition", tab === t ? "bg-black/[.05]" : "text-ink-3 hover:text-ink")}>
@@ -123,11 +123,11 @@ export function Workspace({ initial }: { initial: ProjectDetailDTO }) {
               </button>
             ))}
           </div>
-          <div className={cx("min-h-0 flex-1", tab === "chat" ? "block" : "lg:hidden")}>
+          <div className={cx("lg:min-h-0 lg:flex-1", tab === "chat" ? "block" : "lg:hidden")}>
             <h2 className="px-4 pt-4 text-[11px] font-semibold uppercase tracking-[.08em] text-ink-3 lg:hidden">AI chat</h2>
             <div className="h-[28rem] lg:h-full"><ChatPanel ref={chat} project={project} onChange={refresh} onActivateVersion={activate} /></div>
           </div>
-          <div className={cx("scroll-thin min-h-0 flex-1 overflow-y-auto", tab === "model" ? "block" : "lg:hidden")}>
+          <div className={cx("scroll-thin lg:min-h-0 lg:flex-1 lg:overflow-y-auto", tab === "model" ? "block" : "lg:hidden")}>
             <ModelPanel project={project} version={current} onChange={refresh} />
           </div>
         </div>

@@ -90,3 +90,8 @@ Needs a Node host with a persistent disk (SQLite + local storage) – e.g. a VM,
 
 ## Not built yet
 Direct printer sending / slicing / queue (interface sketched), mesh hole-filling and thickening, segmentation service, UI translations (UI is English; the assistant answers in your language), real accounts.
+
+## On your phone
+- **Install it:** open the app in Safari → Share → *Add to Home Screen* (Android Chrome: *Install app*). It runs full-screen with its own icon (`src/app/manifest.ts`, icons in `public/icons`, regenerate with `node scripts/make-icons.mjs`). The app needs a connection to the server – there is no offline mode.
+- **Camera needs HTTPS** (see Quick start). Over plain HTTP use *Upload photos* or *Use the iPhone camera app instead*.
+- Layout on phones: viewer → AI chat → dimensions / print check / settings / export → versions. Inputs are ≥16px (no Safari zoom-on-focus), tap targets ≥40px, safe-area insets respected.
