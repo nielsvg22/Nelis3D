@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --color-bg: #f7f7f8;
+  --color-surface: #ffffff;
+  --color-line: #e7e7ea;
+  --color-line-strong: #d4d4d9;
+  --color-ink: #111114;
+  --color-ink-2: #55555d;
+  --color-ink-3: #8a8a93;
+  --color-accent: #2f5bff;
+  --color-accent-soft: #eef2ff;
+  --color-ok: #12805c;
+  --color-ok-soft: #e8f6f0;
+  --color-warn: #a35a00;
+  --color-warn-soft: #fff4e0;
+  --color-bad: #c0262d;
+  --color-bad-soft: #fdecec;
+  --radius-card: 18px;
+  --shadow-card: 0 1px 2px rgb(16 16 24 / 0.04), 0 8px 24px -12px rgb(16 16 24 / 0.08);
+}
+
+html, body { background: var(--color-bg); color: var(--color-ink); }
+body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; letter-spacing: -0.006em; }
+* { -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: 8px; }
+
+.card { background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-card); box-shadow: var(--shadow-card); }
+.hairline { border-color: var(--color-line); }
+.scroll-thin { scrollbar-width: thin; scrollbar-color: var(--color-line-strong) transparent; }
+.safe-b { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+
+@keyframes shimmer { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
+.shimmer { background: linear-gradient(90deg, #efeff2 25%, #f7f7f9 37%, #efeff2 63%); background-size: 200% 100%; animation: shimmer 1.6s infinite; }
+@keyframes pulse-bar { 0% { transform: translateX(-100%) } 100% { transform: translateX(250%) } }
+.bar-indeterminate::after { content: ""; position: absolute; inset: 0; width: 40%; background: linear-gradient(90deg, transparent, rgb(255 255 255 / .55), transparent); animation: pulse-bar 1.4s infinite; }
+@keyframes rise { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
+.rise { animation: rise .25s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .shimmer, .bar-indeterminate::after, .rise { animation: none } }
