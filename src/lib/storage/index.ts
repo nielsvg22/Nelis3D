@@ -1,5 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { eq, sql } from "drizzle-orm";
+import { getDb, schema } from "../db/client";
 import { env } from "../env";
 
 /**
@@ -40,13 +42,39 @@ class LocalStorage implements Storage {
   }
 }
 
+/** Private binary store inside Postgres – works on any serverless host without extra services. Keep objects < ~20 MB. */
+class PostgresStorage implements Storage {
+  async put(key: string, data: Uint8Array) {
+    const db = await getDb();
+    const buf = Buffer.from(data);
+    await db.insert(schema.files).values({ key, data: buf, size: buf.length }).onConflictDoUpdate({ target: schema.files.key, set: { data: buf, size: buf.length } });
+  }
+  async get(key: string) {
+    const db = await getDb();
+    const [row] = await db.select({ data: schema.files.data }).from(schema.files).where(eq(schema.files.key, key)).limit(1);
+    if (!row) throw new Error(`File not found: ${key}`);
+    return Buffer.from(row.data);
+  }
+  async exists(key: string) {
+    const db = await getDb();
+    return (await db.select({ k: schema.files.key }).from(schema.files).where(eq(schema.files.key, key)).limit(1)).length > 0;
+  }
+  async delete(key: string) {
+    const db = await getDb();
+    await db.delete(schema.files).where(eq(schema.files.key, key));
+  }
+  async deletePrefix(prefix: string) {
+    const db = await getDb();
+    await db.delete(schema.files).where(sql`starts_with(${schema.files.key}, ${prefix})`);
+  }
+}
+
 let instance: Storage | null = null;
 export function getStorage(): Storage {
   if (!instance) {
-    if (env.storageDriver !== "local") {
-      throw new Error(`STORAGE_DRIVER="${env.storageDriver}" is not implemented. Add a driver in src/lib/storage/index.ts (see README → Storage).`);
-    }
-    instance = new LocalStorage(env.storageDir);
+    if (env.storageDriver === "postgres") instance = new PostgresStorage();
+    else if (env.storageDriver === "local") instance = new LocalStorage(env.storageDir);
+    else throw new Error(`STORAGE_DRIVER="${env.storageDriver}" is not implemented. Add a driver in src/lib/storage/index.ts (see README → Storage).`);
   }
   return instance;
 }

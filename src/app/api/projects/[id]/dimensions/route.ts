@@ -12,11 +12,11 @@ const body = z.object({
 });
 
 export const POST = route<{ id: string }>(async (req, { user, params }) => {
-  const project = ownedProject(user, params.id);
+  const project = await ownedProject(user, params.id);
   const parsed = body.safeParse(await readJson(req));
   if (!parsed.success) throw new HttpError(400, "Invalid dimensions");
   const vid = parsed.data.versionId ?? project.currentVersionId;
-  if (!vid || !getVersion(params.id, vid)) throw new HttpError(404, "No model to resize");
+  if (!vid || !(await getVersion(params.id, vid))) throw new HttpError(404, "No model to resize");
   const { x, y, z, uniform } = parsed.data;
   const v = await resizeVersion(params.id, vid, { x, y, z }, uniform);
   return { versionId: v.id };

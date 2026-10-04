@@ -9,7 +9,7 @@ export const metadata = { title: "My Projects – Nelis3D" };
 
 export default async function ProjectsPage() {
   const user = await getCurrentUser();
-  const projects = listProjects(user.id);
+  const projects = await listProjects(user.id);
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
       <div className="mb-6 flex items-end justify-between gap-4">

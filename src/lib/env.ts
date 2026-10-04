@@ -2,11 +2,22 @@ import path from "node:path";
 
 /** Central, typed access to environment variables. Never hardcode secrets. */
 export const env = {
-  get databasePath() {
-    return path.resolve(process.env.DATABASE_PATH ?? "./data/nelis3d.db");
+  /** Postgres connection string (Neon etc.). Unset ⇒ embedded PGlite for local dev. */
+  get databaseUrl() {
+    return process.env.DATABASE_URL?.trim() || undefined;
   },
+  get pglitePath() {
+    return path.resolve(process.env.PGLITE_PATH ?? "./data/pglite");
+  },
+  /** "postgres" (default on Vercel) or "local" disk (default in dev) */
   get storageDriver() {
-    return process.env.STORAGE_DRIVER ?? "local";
+    return process.env.STORAGE_DRIVER ?? (process.env.VERCEL || process.env.DATABASE_URL ? "postgres" : "local");
+  },
+  get isServerless() {
+    return !!process.env.VERCEL;
+  },
+  get cronSecret() {
+    return process.env.CRON_SECRET?.trim() || undefined;
   },
   get storageDir() {
     return path.resolve(process.env.STORAGE_LOCAL_DIR ?? "./data/storage");

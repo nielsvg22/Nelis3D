@@ -15,11 +15,11 @@ const schema = z.object({
 });
 
 export const PATCH = route<{ id: string }>(async (req, { user, params }) => {
-  ownedProject(user, params.id);
+  await ownedProject(user, params.id);
   const parsed = schema.safeParse(await readJson(req));
   if (!parsed.success) throw new HttpError(400, "Invalid print settings");
-  const settings = updateSettings(user.id, params.id, parsed.data);
-  const p = getProject(params.id);
+  const settings = await updateSettings(user.id, params.id, parsed.data);
+  const p = await getProject(params.id);
   if (p?.currentVersionId) await recheckVersion(params.id, p.currentVersionId, settings); // refresh the print check for the new material
   return { settings };
 });

@@ -1,4 +1,4 @@
 import { eq } from "drizzle-orm";
-import { getDb, schema } from "../db/client";
+import { first, getDb, schema } from "../db/client";
 
-export const getProject = (id: string) => getDb().select().from(schema.projects).where(eq(schema.projects.id, id)).get();
+export const getProject = async (id: string) => first((await getDb()).select().from(schema.projects).where(eq(schema.projects.id, id)));

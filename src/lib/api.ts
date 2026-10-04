@@ -5,6 +5,10 @@ import { getOwnedProject } from "./services/projects";
 import { NotManifoldError } from "./geometry/manifold";
 import { CadSpecError } from "./geometry/cadspec";
 import { ExportBlockedError } from "./services/exports";
+import { env } from "./env";
+
+/** Vercel functions reject request bodies > 4.5 MB; stay a bit below so we can answer with a clear message. */
+export const MAX_BODY_BYTES = env.isServerless ? 4_000_000 : 200_000_000;
 
 export class HttpError extends Error {
   constructor(public status: number, message: string, public code?: string) {
@@ -34,8 +38,8 @@ export function route<P extends Record<string, string | string[]> = Record<strin
   };
 }
 
-export function ownedProject(user: SessionUser, id: string) {
-  const p = getOwnedProject(user.id, id);
+export async function ownedProject(user: SessionUser, id: string) {
+  const p = await getOwnedProject(user.id, id);
   if (!p) throw new HttpError(404, "Project not found");
   return p;
 }

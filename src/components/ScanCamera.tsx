@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, ApiError } from "@/lib/client";
+import { ApiError } from "@/lib/client";
+import { createEmptyProject, uploadPhotos } from "@/lib/client/uploadPhotos";
 import { analyzeFrame, feedbackFor, meanDiff, type Feedback, type FrameStats } from "@/lib/scan/analyzeFrame";
 import { Button, Icon, ProgressBar, Spinner, cx } from "./ui";
 
@@ -25,6 +26,7 @@ export function ScanCamera({ projectId, name }: { projectId?: string; name?: str
   const [sectors, setSectors] = useState(0);
   const [hasHeading, setHasHeading] = useState(false);
   const [flash, setFlash] = useState(false);
+  const [progressText, setProgressText] = useState("");
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -161,20 +163,12 @@ export function ScanCamera({ projectId, name }: { projectId?: string; name?: str
     setPhase("uploading");
     setError(null);
     try {
-      const fd = new FormData();
-      included.forEach((f, i) => fd.append("files", f.blob, `frame-${String(i + 1).padStart(3, "0")}.jpg`));
-      fd.append("source", "camera");
-      if (projectId) {
-        await api(`/api/projects/${projectId}/images`, { method: "POST", body: fd });
-        router.push(`/projects/${projectId}`);
-      } else {
-        fd.append("name", name || "Scanned object");
-        fd.append("mode", "reconstruct");
-        const res = await api<{ id: string }>("/api/projects", { method: "POST", body: fd });
-        router.push(`/projects/${res.id}`);
-      }
+      const files = included.map((f, i) => new File([f.blob], `frame-${String(i + 1).padStart(3, "0")}.jpg`, { type: "image/jpeg" }));
+      const id = projectId ?? (await createEmptyProject(name || "Scanned object", "reconstruct"));
+      await uploadPhotos(id, files, "camera", (d, t) => setProgressText(`Uploading ${d}/${t}…`));
+      router.push(`/projects/${id}`);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Upload failed. Check your connection and try again.");
+      setError(e instanceof ApiError || e instanceof Error ? e.message : "Upload failed. Check your connection and try again.");
       setPhase("review");
     }
   }
@@ -276,7 +270,7 @@ export function ScanCamera({ projectId, name }: { projectId?: string; name?: str
       </div>
       <div className="mt-5 flex justify-end gap-2">
         <Button onClick={submit} variant="primary" size="lg" disabled={included.length === 0 || phase === "uploading"}>
-          {phase === "uploading" ? <><Spinner /> Uploading…</> : projectId ? "Add to project" : "Create project"}
+          {phase === "uploading" ? <><Spinner /> {progressText || "Uploading…"}</> : projectId ? "Add to project" : "Create project"}
         </Button>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { getDb, schema } from "../db/client";
+import { first, getDb, schema } from "../db/client";
 import { getStorage } from "../storage";
 import { placeOnBed, rotateMesh, dimensions } from "../geometry/mesh";
 import { write3mf } from "../geometry/io/threemf";
@@ -17,9 +17,9 @@ export class ExportBlockedError extends Error {}
  * The file is also persisted under `<project>/exports/model-v<N>.<ext>`.
  */
 export async function exportVersion(projectId: string, versionId: string, format: ExportFormat, opts: { orient?: "as-is" | "best"; force?: boolean } = {}) {
-  const v = getVersion(projectId, versionId);
+  const v = await getVersion(projectId, versionId);
   if (!v) throw new Error("Version not found");
-  const p = getDb().select().from(schema.projects).where(eq(schema.projects.id, projectId)).get()!;
+  const p = (await first((await getDb()).select().from(schema.projects).where(eq(schema.projects.id, projectId))))!;
   const { settings, printer, material } = resolveProfile(p.printSettings);
   let mesh = await loadVersionMesh(v);
 

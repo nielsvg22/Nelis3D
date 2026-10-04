@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { api, ApiError } from "@/lib/client";
+import { createEmptyProject, uploadPhotos } from "@/lib/client/uploadPhotos";
 import { Button, Icon, Spinner, cx, type IconName } from "./ui";
 import { ScanCamera } from "./ScanCamera";
 
@@ -66,6 +67,7 @@ function Uploader({ kind, name, projectId }: { kind: "photos" | "model"; name: s
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [drag, setDrag] = useState(false);
+  const [pct, setPct] = useState("");
   const accept = kind === "photos" ? "image/*,.heic,.heif" : ".stl,.obj,.3mf";
 
   function pick(list: FileList | null) {
@@ -79,20 +81,20 @@ function Uploader({ kind, name, projectId }: { kind: "photos" | "model"; name: s
     setBusy(true);
     setError(null);
     try {
-      const fd = new FormData();
-      files.forEach((f) => fd.append("files", f));
-      if (projectId) {
-        await api(`/api/projects/${projectId}/images`, { method: "POST", body: fd });
-        router.push(`/projects/${projectId}`);
+      if (kind === "photos") {
+        const id = projectId ?? (await createEmptyProject(name || "New scan", "reconstruct"));
+        await uploadPhotos(id, files, "upload", (d, t) => setPct(`Uploading ${d}/${t}…`));
+        router.push(`/projects/${id}`);
       } else {
+        const fd = new FormData();
+        fd.append("files", files[0]);
         fd.append("name", name);
-        fd.append("source", "upload");
-        fd.append("mode", kind === "photos" ? "reconstruct" : "modify");
+        fd.append("mode", "modify");
         const res = await api<{ id: string }>("/api/projects", { method: "POST", body: fd });
         router.push(`/projects/${res.id}`);
       }
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Upload failed.");
+      setError(e instanceof ApiError || e instanceof Error ? e.message : "Upload failed.");
       setBusy(false);
     }
   }
@@ -132,7 +134,7 @@ function Uploader({ kind, name, projectId }: { kind: "photos" | "model"; name: s
       )}
       {error && <p className="mt-4 rounded-xl bg-bad-soft p-3 text-sm text-bad" role="alert">{error}</p>}
       <div className="mt-5 flex justify-end">
-        <Button variant="primary" size="lg" disabled={!files.length || busy} onClick={submit}>{busy ? <><Spinner /> Uploading…</> : projectId ? "Add to project" : "Create project"}</Button>
+        <Button variant="primary" size="lg" disabled={!files.length || busy} onClick={submit}>{busy ? <><Spinner /> {pct || "Uploading…"}</> : projectId ? "Add to project" : "Create project"}</Button>
       </div>
     </div>
   );

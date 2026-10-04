@@ -44,8 +44,9 @@ See `.env.example`. Keys are only ever read from the environment (`src/lib/env.t
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | analysis, chat planning, parametric design |
 | `MESHY_API_KEY`, `MESHY_AI_MODEL` | photo → mesh reconstruction |
 | `AI_PROVIDER` | `auto` (use keys present) or `local` (force offline) |
-| `DATABASE_PATH` | SQLite file |
-| `STORAGE_DRIVER`, `STORAGE_LOCAL_DIR` | file storage |
+| `DATABASE_URL` | Postgres connection string (unset ⇒ embedded PGlite) |
+| `STORAGE_DRIVER`, `STORAGE_LOCAL_DIR` | `postgres` or `local` file storage |
+| `CRON_SECRET` | protects `/api/cron/maintenance` |
 | `DEV_USER_EMAIL` | the single development user |
 | `SCAN_IMAGE_RETENTION_HOURS` | auto-delete scan photos N hours after a model exists (0 = keep until deleted) |
 
@@ -57,10 +58,13 @@ See `.env.example`. Keys are only ever read from the environment (`src/lib/env.t
 To swap a backend (Tripo, Rodin, Luma, a self-hosted COLMAP/2DGS or TRELLIS service…) implement the same function signature and change one line in the registry.
 
 ## Database
-SQLite via Drizzle (`src/lib/db/schema.ts`): `users, projects, scans, scan_images, models, model_versions, prompts, print_profiles, jobs`. Migrations live in `drizzle/` and run automatically. After schema changes: `npm run db:generate`. To use Postgres, switch the Drizzle dialect/driver in `db/client.ts` and `drizzle.config.ts`.
+Postgres via Drizzle (`src/lib/db/schema.ts`): `users, projects, scans, scan_images, models, model_versions, prompts, print_profiles, jobs, files`.
+- `DATABASE_URL` set → node-postgres (Neon, Supabase, any Postgres). Used on Vercel.
+- unset → **PGlite**, an embedded Postgres in `./data/pglite` (zero-setup local dev, same schema).
+Migrations live in `drizzle/` and are applied automatically (with an advisory lock) on first use. After schema changes: `npm run db:generate`.
 
 ## Storage
-`src/lib/storage/index.ts` is a small interface (`put/get/exists/delete/deletePrefix`). `local` is implemented; add an S3/R2 driver by implementing it and returning it for `STORAGE_DRIVER=s3`. Layout per project:
+`src/lib/storage/index.ts` is a small interface (`put/get/exists/delete/deletePrefix`) with two drivers: `local` (disk, dev default) and `postgres` (private `files` table; default when `DATABASE_URL`/`VERCEL` is set – no extra service needed). Add S3/R2/Vercel Blob by implementing the interface. Logical layout per project:
 ```
 <project-name>-<id>/scan/images/0001.jpg … (+ thumbs/)
 <project-name>-<id>/models/model-v1.stl, model-v2.stl …
@@ -68,7 +72,7 @@ SQLite via Drizzle (`src/lib/db/schema.ts`): `users, projects, scans, scan_image
 ```
 
 ## Background jobs
-Analysis, reconstruction and chat turns are jobs in the `jobs` table with progress + stage. The browser polls; you can close the page and return. Jobs interrupted by a restart are re-queued, and provider state (e.g. the Meshy task id) is persisted so they resume without paying twice. The worker is in-process (`jobs/queue.ts`, started via `instrumentation.ts`) – fine for one node; for scale-out move `processNext` into a worker or swap in BullMQ/Inngest/pg-boss (handlers are queue-agnostic).
+Analysis, reconstruction and chat turns are rows in `jobs` with progress + stage, executed in short **steps** (no resident worker, so it runs on serverless): a step starts right after the request (`after()`), the open page's polling keeps long jobs moving (e.g. polling Meshy), and a daily cron (`/api/cron/maintenance`) is the safety net. `jobs.state` stores provider state (the Meshy task id) so nothing is started or paid twice. You can close the page; reconstruction continues on the provider side and is finished the next time you open the project (or by the cron). To use a real queue (Inngest/QStash/BullMQ) call `advanceJob` from its consumer.
 
 ## Authentication
 `src/lib/auth.ts#getCurrentUser` returns a development user. Every route/service already filters by user id; plug Auth.js/Clerk/Supabase in there.
@@ -76,11 +80,15 @@ Analysis, reconstruction and chat turns are jobs in the `jobs` table with progre
 ## Privacy
 Photos have metadata stripped, are stored only in your storage, and are sent to the configured AI services *only* for analysis/reconstruction. “Delete photos” and “Delete project” remove DB rows **and** files. Optional automatic purge via `SCAN_IMAGE_RETENTION_HOURS`.
 
-## Production
-```bash
-npm run build && npm start
-```
-Needs a Node host with a persistent disk (SQLite + local storage) – e.g. a VM, Fly.io/Railway with a volume, or Docker. Serverless platforms (Vercel) need Postgres + S3-compatible storage + an external worker; the interfaces above are the seams for that. Serve over HTTPS for the camera. `sharp`, `better-sqlite3` and `manifold-3d` are marked as server-external in `next.config.mjs`.
+## Deploy on Vercel
+1. Create a Postgres (Neon via Vercel Marketplace) and set `DATABASE_URL` (+ `CRON_SECRET`, and the AI keys) in the Vercel project's environment variables.
+2. Import the repo in Vercel (framework: Next.js) – `vercel.json` sets the region and the daily cron. Or `vercel deploy --prod` with the CLI.
+3. Keep **Vercel Authentication** (Project → Settings → Deployment Protection) on until real accounts exist – the app currently has a single development user.
+
+Serverless limits that shaped the design: request/response bodies ≈ 4.5 MB (photos are shrunk and uploaded in batches in the browser; meshes are streamed; **3D-model uploads are limited to ≈4 MB** on Vercel), function duration ≤ 300 s (jobs are stepped), no writable disk (files live in Postgres). `sharp`, `pg`, `pglite` and `manifold-3d` are server-external in `next.config.mjs`.
+
+## Production elsewhere
+`npm run build && npm start` on any Node host with `DATABASE_URL` (or a persistent disk for PGlite).
 
 ## K1 Max profile
 `src/lib/printing/profiles.ts`: 300×300×300 mm, 0.4 mm nozzle, PLA default (+ PETG, ABS, ASA, TPU – add more there). Per-project settings (material, layer height, infill, supports) drive the print check thresholds (min wall, overhang angle) and the metadata embedded in the 3MF.

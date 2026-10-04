@@ -4,16 +4,30 @@ import { exportVersion, type ExportFormat } from "@/lib/services/exports";
 import { activateVersion, getVersion, loadVersionMesh, orientVersion, repairVersion, saveVersionPreview } from "@/lib/services/versions";
 import { getStorage } from "@/lib/storage";
 
+/** Chunked body: serverless platforms cap *buffered* responses at ~4.5 MB but allow streamed ones. */
+function streamed(buf: Buffer, headers: Record<string, string>) {
+  const CH = 64 * 1024;
+  let off = 0;
+  const body = new ReadableStream<Uint8Array>({
+    pull(c) {
+      if (off >= buf.length) return c.close();
+      c.enqueue(new Uint8Array(buf.subarray(off, off + CH)));
+      off += CH;
+    },
+  });
+  return new Response(body, { headers });
+}
+
 type P = { id: string; vid: string; action: string };
 
 export const GET = route<P>(async (req, { user, params }) => {
-  ownedProject(user, params.id);
-  const v = getVersion(params.id, params.vid);
+  await ownedProject(user, params.id);
+  const v = await getVersion(params.id, params.vid);
   if (!v) throw new HttpError(404, "Version not found");
   switch (params.action) {
     case "mesh": {
       const buf = await getStorage().get(v.storageKey);
-      return new Response(new Uint8Array(buf), { headers: { "Content-Type": "model/stl", "Cache-Control": "private, max-age=31536000, immutable" } });
+      return streamed(buf, { "Content-Type": "model/stl", "Cache-Control": "private, max-age=31536000, immutable" });
     }
     case "preview": {
       if (!v.previewKey) throw new HttpError(404, "No preview yet");
@@ -25,9 +39,7 @@ export const GET = route<P>(async (req, { user, params }) => {
       const format = (q.get("format") ?? "3mf") as ExportFormat;
       if (format !== "stl" && format !== "3mf") throw new HttpError(400, "format must be stl or 3mf");
       const out = await exportVersion(params.id, v.id, format, { orient: q.get("orient") === "best" ? "best" : "as-is", force: q.get("force") === "1" });
-      return new Response(new Uint8Array(out.bytes), {
-        headers: { "Content-Type": out.contentType, "Content-Disposition": `attachment; filename="${out.filename}"`, "X-Print-Orientation": out.orientation },
-      });
+      return streamed(Buffer.from(out.bytes), { "Content-Type": out.contentType, "Content-Disposition": `attachment; filename="${out.filename}"`, "X-Print-Orientation": out.orientation });
     }
     default:
       throw new HttpError(404, "Unknown action");
@@ -35,12 +47,12 @@ export const GET = route<P>(async (req, { user, params }) => {
 });
 
 export const POST = route<P>(async (req, { user, params }) => {
-  ownedProject(user, params.id);
-  const v = getVersion(params.id, params.vid);
+  await ownedProject(user, params.id);
+  const v = await getVersion(params.id, params.vid);
   if (!v) throw new HttpError(404, "Version not found");
   switch (params.action) {
     case "activate":
-      activateVersion(params.id, v.id);
+      await activateVersion(params.id, v.id);
       return { ok: true };
     case "preview": {
       const buf = Buffer.from(await req.arrayBuffer());

@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import { getDb, schema } from "../db/client";
+import { first, getDb, schema } from "../db/client";
 import { getProvider } from "../ai/registry";
 import { newId, slugify } from "../ids";
 import { getStorage } from "../storage";
@@ -22,31 +22,31 @@ export const toJobDTO = (j: typeof jobs.$inferSelect): JobDTO => ({
   createdAt: j.createdAt.toISOString(),
 });
 
-export function createProject(userId: string, name: string, mode: ProjectMode) {
-  const db = getDb();
+export async function createProject(userId: string, name: string, mode: ProjectMode) {
+  const db = await getDb();
   const id = newId("p_");
   const clean = name.trim().slice(0, 80) || "Untitled project";
   const prefix = `${slugify(clean)}-${id.slice(2, 8).toLowerCase().replace(/[^a-z0-9]/g, "x")}/`;
-  db.insert(projects).values({ id, userId, name: clean, mode, storagePrefix: prefix, printSettings: { ...DEFAULT_PRINT_SETTINGS } }).run();
+  await db.insert(projects).values({ id, userId, name: clean, mode, storagePrefix: prefix, printSettings: { ...DEFAULT_PRINT_SETTINGS } });
   // remember the user's default print profile
-  if (!db.select().from(printProfiles).where(eq(printProfiles.userId, userId)).get()) {
-    db.insert(printProfiles).values({ id: newId("pp_"), userId, name: "Creality K1 Max · PLA", settings: DEFAULT_PRINT_SETTINGS, isDefault: true }).run();
+  if (!(await first(db.select().from(printProfiles).where(eq(printProfiles.userId, userId)).limit(1)))) {
+    await db.insert(printProfiles).values({ id: newId("pp_"), userId, name: "Creality K1 Max · PLA", settings: DEFAULT_PRINT_SETTINGS, isDefault: true });
   }
-  return db.select().from(projects).where(eq(projects.id, id)).get()!;
+  return (await first(db.select().from(projects).where(eq(projects.id, id))))!;
 }
 
-export function getOwnedProject(userId: string, projectId: string) {
-  return getDb().select().from(projects).where(and(eq(projects.id, projectId), eq(projects.userId, userId))).get();
+export async function getOwnedProject(userId: string, projectId: string) {
+  return first((await getDb()).select().from(projects).where(and(eq(projects.id, projectId), eq(projects.userId, userId))));
 }
 
-export function listProjects(userId: string): ProjectSummaryDTO[] {
-  const db = getDb();
-  const rows = db.select().from(projects).where(eq(projects.userId, userId)).orderBy(desc(projects.updatedAt)).all();
+export async function listProjects(userId: string): Promise<ProjectSummaryDTO[]> {
+  const db = await getDb();
+  const rows = await db.select().from(projects).where(eq(projects.userId, userId)).orderBy(desc(projects.updatedAt));
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
-  const versions = db.select().from(modelVersions).where(inArray(modelVersions.projectId, ids)).all();
-  const images = db.select({ projectId: scanImages.projectId }).from(scanImages).where(inArray(scanImages.projectId, ids)).all();
-  const active = db.select().from(jobs).where(inArray(jobs.projectId, ids)).orderBy(desc(jobs.createdAt)).all();
+  const versions = await db.select().from(modelVersions).where(inArray(modelVersions.projectId, ids));
+  const images = await db.select({ projectId: scanImages.projectId }).from(scanImages).where(inArray(scanImages.projectId, ids));
+  const active = await db.select().from(jobs).where(inArray(jobs.projectId, ids)).orderBy(desc(jobs.createdAt));
   return rows.map((p) => {
     const vs = versions.filter((v) => v.projectId === p.id);
     const cur = vs.find((v) => v.id === p.currentVersionId) ?? null;
@@ -64,14 +64,14 @@ export function listProjects(userId: string): ProjectSummaryDTO[] {
   });
 }
 
-export function getProjectDetail(userId: string, projectId: string): ProjectDetailDTO | null {
-  const db = getDb();
-  const p = getOwnedProject(userId, projectId);
+export async function getProjectDetail(userId: string, projectId: string): Promise<ProjectDetailDTO | null> {
+  const db = await getDb();
+  const p = await getOwnedProject(userId, projectId);
   if (!p) return null;
-  const images = db.select().from(scanImages).where(eq(scanImages.projectId, p.id)).orderBy(asc(scanImages.position)).all();
-  const versions = db.select().from(modelVersions).where(eq(modelVersions.projectId, p.id)).orderBy(asc(modelVersions.number)).all();
-  const messages = db.select().from(prompts).where(eq(prompts.projectId, p.id)).orderBy(asc(prompts.createdAt)).all();
-  const projectJobs = db.select().from(jobs).where(eq(jobs.projectId, p.id)).orderBy(desc(jobs.createdAt)).limit(10).all();
+  const images = await db.select().from(scanImages).where(eq(scanImages.projectId, p.id)).orderBy(asc(scanImages.position));
+  const versions = await db.select().from(modelVersions).where(eq(modelVersions.projectId, p.id)).orderBy(asc(modelVersions.number));
+  const messages = await db.select().from(prompts).where(eq(prompts.projectId, p.id)).orderBy(asc(prompts.createdAt));
+  const projectJobs = await db.select().from(jobs).where(eq(jobs.projectId, p.id)).orderBy(desc(jobs.createdAt)).limit(10);
   const active = projectJobs.find((j) => j.status === "queued" || j.status === "running") ?? null;
   const latest = projectJobs[0];
   const provider = getProvider();
@@ -94,42 +94,42 @@ export function getProjectDetail(userId: string, projectId: string): ProjectDeta
   };
 }
 
-export function addMessage(projectId: string, role: "user" | "assistant" | "system", content: string, versionId?: string | null, meta?: Record<string, unknown> | null) {
+export async function addMessage(projectId: string, role: "user" | "assistant" | "system", content: string, versionId?: string | null, meta?: Record<string, unknown> | null) {
   const row = { id: newId("msg_"), projectId, role, content, versionId: versionId ?? null, meta: meta ?? null };
-  getDb().insert(prompts).values(row).run();
+  await (await getDb()).insert(prompts).values(row);
   return row;
 }
 
-export function updateSettings(userId: string, projectId: string, patch: Partial<PrintSettings>) {
-  const p = getOwnedProject(userId, projectId);
+export async function updateSettings(userId: string, projectId: string, patch: Partial<PrintSettings>) {
+  const p = await getOwnedProject(userId, projectId);
   if (!p) throw new Error("Project not found");
   const settings = resolveProfile({ ...(p.printSettings ?? {}), ...patch }).settings;
-  getDb().update(projects).set({ printSettings: settings, updatedAt: new Date() }).where(eq(projects.id, projectId)).run();
+  await (await getDb()).update(projects).set({ printSettings: settings, updatedAt: new Date() }).where(eq(projects.id, projectId));
   return settings;
 }
 
-export function renameProject(userId: string, projectId: string, name: string) {
-  const p = getOwnedProject(userId, projectId);
+export async function renameProject(userId: string, projectId: string, name: string) {
+  const p = await getOwnedProject(userId, projectId);
   if (!p) throw new Error("Project not found");
-  getDb().update(projects).set({ name: name.trim().slice(0, 80) || p.name, updatedAt: new Date() }).where(eq(projects.id, projectId)).run();
+  await (await getDb()).update(projects).set({ name: name.trim().slice(0, 80) || p.name, updatedAt: new Date() }).where(eq(projects.id, projectId));
 }
 
 /** Irreversibly removes DB rows AND every stored file (photos, meshes, exports). */
 export async function deleteProject(userId: string, projectId: string) {
-  const p = getOwnedProject(userId, projectId);
+  const p = await getOwnedProject(userId, projectId);
   if (!p) return false;
   await getStorage().deletePrefix(p.storagePrefix);
-  getDb().delete(projects).where(eq(projects.id, projectId)).run(); // cascades to scans, images, models, versions, prompts, jobs
+  await (await getDb()).delete(projects).where(eq(projects.id, projectId)); // cascades to scans, images, models, versions, prompts, jobs
   return true;
 }
 
 /** Privacy: remove only the scan photos, keep models. */
 export async function deleteScanPhotos(userId: string, projectId: string) {
-  const p = getOwnedProject(userId, projectId);
+  const p = await getOwnedProject(userId, projectId);
   if (!p) return false;
-  const db = getDb();
+  const db = await getDb();
   await getStorage().deletePrefix(`${p.storagePrefix}scan/`);
-  db.delete(scanImages).where(eq(scanImages.projectId, projectId)).run();
-  db.delete(scans).where(eq(scans.projectId, projectId)).run();
+  await db.delete(scanImages).where(eq(scanImages.projectId, projectId));
+  await db.delete(scans).where(eq(scans.projectId, projectId));
   return true;
 }

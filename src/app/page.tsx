@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const user = await getCurrentUser();
-  const projects = listProjects(user.id);
+  const projects = await listProjects(user.id);
   const cap = getProvider().capabilities();
   const missing = [!cap.analysis.available && "ANTHROPIC_API_KEY", !cap.reconstruction.available && "MESHY_API_KEY"].filter(Boolean);
 

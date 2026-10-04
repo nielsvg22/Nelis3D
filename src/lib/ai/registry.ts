@@ -3,7 +3,7 @@ import { checkPrintability } from "../geometry/printability";
 import { dimensions } from "../geometry/mesh";
 import { claudeAnalyze, claudeDesign, claudeModify, claudePlanTurn, describeContext } from "./anthropic";
 import { localAnalyzeMesh, localAnalyzePhotos, localPlanTurn } from "./local";
-import { meshyReconstruct } from "./meshy";
+import { meshyReconstructStep } from "./meshy";
 import { AiError, type AIProvider, type ProviderCapabilities } from "./types";
 
 /**
@@ -42,7 +42,7 @@ export function getProvider(): AIProvider {
 
     async reconstructModel(input) {
       if (!useMeshy) throw new AiError("NOT_CONFIGURED", "Photo reconstruction is not configured.", "Set MESHY_API_KEY in .env.local (see README → AI providers).");
-      return meshyReconstruct(input);
+      return meshyReconstructStep(input);
     },
 
     async modifyModel({ instruction, context }) {

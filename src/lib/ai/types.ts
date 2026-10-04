@@ -74,6 +74,10 @@ export interface ReconstructResult {
   provider: string;
 }
 
+export type ReconstructStep =
+  | { status: "pending"; progress: number; stage: string; state: Record<string, unknown> }
+  | { status: "done"; result: ReconstructResult };
+
 export interface ModifyResult {
   ops: EditOp[];
   label: string;
@@ -95,13 +99,11 @@ export interface AIProvider {
   capabilities(): ProviderCapabilities;
 
   analyzeObject(input: { images: AiImage[]; mesh?: Mesh; hint?: string }): Promise<ObjectAnalysis>;
-  reconstructModel(input: {
-    images: AiImage[];
-    analysis?: ObjectAnalysis | null;
-    state: Record<string, unknown>;
-    saveState: (s: Record<string, unknown>) => void | Promise<void>;
-    onProgress: ProgressFn;
-  }): Promise<ReconstructResult>;
+  /**
+   * One short STEP of a (possibly minutes-long) reconstruction. Serverless-friendly: the caller persists
+   * `state` between calls and calls again until `status === "done"`.
+   */
+  reconstructModel(input: { images: AiImage[]; analysis?: ObjectAnalysis | null; state: Record<string, unknown> }): Promise<ReconstructStep>;
   modifyModel(input: { instruction: string; context: ChatContext }): Promise<ModifyResult>;
   generateFunctionalPart(input: { instruction: string; context: ChatContext }): Promise<DesignResult>;
   checkPrintability(mesh: Mesh, settings: Partial<PrintSettings>): Promise<PrintReport>;

@@ -4,8 +4,8 @@ import { getDb, schema } from "@/lib/db/client";
 import { getStorage } from "@/lib/storage";
 
 export const GET = route<{ id: string; imageId: string }>(async (req, { user, params }) => {
-  ownedProject(user, params.id);
-  const img = getDb().select().from(schema.scanImages).where(eq(schema.scanImages.id, params.imageId)).get();
+  await ownedProject(user, params.id);
+  const [img] = await (await getDb()).select().from(schema.scanImages).where(eq(schema.scanImages.id, params.imageId)).limit(1);
   if (!img || img.projectId !== params.id) throw new HttpError(404, "Image not found");
   const full = new URL(req.url).searchParams.get("size") === "full";
   const buf = await getStorage().get(full ? img.storageKey : img.thumbKey);
