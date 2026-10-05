@@ -11,7 +11,7 @@ export default async function Home() {
   const user = await getCurrentUser();
   const projects = await listProjects(user.id);
   const cap = getProvider().capabilities();
-  const missing = [!cap.analysis.available && "ANTHROPIC_API_KEY", !cap.reconstruction.available && "MESHY_API_KEY"].filter(Boolean);
+  const missing = [!cap.analysis.available && "MISTRAL_API_KEY (free) or ANTHROPIC_API_KEY", !cap.reconstruction.available && "HF_TOKEN (free) or MESHY_API_KEY"].filter(Boolean);
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
@@ -39,7 +39,7 @@ export default async function Home() {
             <p className="text-ink-2">
               {!cap.analysis.available && "Photo analysis is off. "}
               {!cap.reconstruction.available && "Photo → 3D reconstruction is off. "}
-              Add {missing.map((m, i) => <span key={String(m)}>{i > 0 && " and "}<code className="rounded bg-black/5 px-1">{m}</code></span>)} to <code className="rounded bg-black/5 px-1">.env.local</code>. Uploading and editing 3D models, offline templates, print checks and export work without keys.
+              Add {missing.map((m, i) => <span key={String(m)}>{i > 0 && " and "}<code className="rounded bg-black/5 px-1">{m}</code></span>)} to the environment variables. Uploading and editing 3D models, offline templates, print checks and export work without keys.
             </p>
           </div>
         </div>

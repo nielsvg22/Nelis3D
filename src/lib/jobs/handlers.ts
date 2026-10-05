@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { AiError, type ChatContext } from "../ai/types";
+import { localPlanTurn } from "../ai/local";
 import { getProvider } from "../ai/registry";
 import { first, getDb, schema } from "../db/client";
 import { buildCadSpec, CadSpecError } from "../geometry/cadspec";
@@ -65,8 +66,13 @@ async function reconstruct(job: Job, progress: Progress): Promise<StepResult> {
     if (images.length === 0) throw new AiError("LOW_QUALITY_INPUT", "There are no selected photos to reconstruct from.");
     if (!project.analysis && provider.capabilities().analysis.available) {
       await progress(3, "Analysing the object first");
-      await analyze(projectId, async () => {});
-      project = (await first(db.select().from(projects).where(eq(projects.id, projectId))))!;
+      try {
+        await analyze(projectId, async () => {});
+        project = (await first(db.select().from(projects).where(eq(projects.id, projectId))))!;
+      } catch (e) {
+        // analysis is optional for reconstruction (it only improves the size estimate) – never block on it
+        console.warn("[reconstruct] analysis skipped:", e instanceof Error ? e.message : e);
+      }
     }
     if (project.analysis && !project.analysis.reconstruction.feasible && !state.force) {
       throw new AiError("LOW_QUALITY_INPUT", "The photos do not look suitable for a reliable reconstruction.", project.analysis.reconstruction.reasons.join(" "));
@@ -137,7 +143,15 @@ async function chat(projectId: string, message: string, progress: Progress) {
 
   await progress(15, "Thinking");
   try {
-    const plan = await provider.planTurn({ message, context: ctx });
+    let plan;
+    try {
+      plan = await provider.planTurn({ message, context: ctx });
+    } catch (e) {
+      if (!(e instanceof AiError) || e.code !== "PROVIDER_ERROR") throw e;
+      const offline = localPlanTurn(message, ctx);
+      if (offline.kind === "reply") throw e; // nothing useful offline – surface the real error
+      plan = { ...offline, reply: `${offline.reply}\n\n(The AI service is unavailable right now, so I used the basic offline mode.)` };
+    }
     switch (plan.kind) {
       case "reply":
         await addMessage(projectId, "assistant", plan.reply);

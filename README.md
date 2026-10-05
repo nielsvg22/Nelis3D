@@ -42,7 +42,9 @@ See `.env.example`. Keys are only ever read from the environment (`src/lib/env.t
 | Variable | Purpose |
 |---|---|
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | analysis, chat planning, parametric design |
-| `MESHY_API_KEY`, `MESHY_AI_MODEL` | photo → mesh reconstruction |
+| `MISTRAL_API_KEY`, `MISTRAL_MODEL` | free LLM alternative (used when no Anthropic key) |
+| `MESHY_API_KEY`, `MESHY_AI_MODEL` | photo → mesh reconstruction (paid) |
+| `HF_TOKEN`, `HF_SPACE` | free photo → mesh via a Hugging Face Space (used when no Meshy key) |
 | `AI_PROVIDER` | `auto` (use keys present) or `local` (force offline) |
 | `DATABASE_URL` | Postgres connection string (unset ⇒ embedded PGlite) |
 | `STORAGE_DRIVER`, `STORAGE_LOCAL_DIR` | `postgres` or `local` file storage |
@@ -52,8 +54,8 @@ See `.env.example`. Keys are only ever read from the environment (`src/lib/env.t
 
 ## AI providers
 `src/lib/ai/types.ts` defines `AIProvider` (`analyzeObject`, `reconstructModel`, `modifyModel`, `generateFunctionalPart`, `checkPrintability`, `planTurn`). `src/lib/ai/registry.ts` composes it from backends:
-- vision/chat/design → `anthropic.ts` (or offline `local.ts`)
-- reconstruction → `meshy.ts`
+- vision/chat/design → `anthropic.ts` → `mistral.ts` (free tier) → offline `local.ts` (first one with a key wins; if the AI service errors, simple commands fall back to the offline planner)
+- reconstruction → `meshy.ts` (paid) → `huggingface.ts` (free TRELLIS Space; single photo, shared GPU, may queue)
 
 To swap a backend (Tripo, Rodin, Luma, a self-hosted COLMAP/2DGS or TRELLIS service…) implement the same function signature and change one line in the registry.
 

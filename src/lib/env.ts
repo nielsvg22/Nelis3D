@@ -37,6 +37,18 @@ export const env = {
   get meshyModel() {
     return process.env.MESHY_AI_MODEL?.trim() || "latest";
   },
+  get mistralKey() {
+    return process.env.MISTRAL_API_KEY?.trim() || undefined;
+  },
+  get mistralModel() {
+    return process.env.MISTRAL_MODEL?.trim() || "mistral-medium-latest";
+  },
+  get hfToken() {
+    return process.env.HF_TOKEN?.trim() || undefined;
+  },
+  get hfSpace() {
+    return process.env.HF_SPACE?.trim() || "trellis-community/TRELLIS";
+  },
   get devUserEmail() {
     return process.env.DEV_USER_EMAIL ?? "dev@nelis3d.local";
   },
